@@ -49,6 +49,10 @@ for _, strategy in helpers.each_strategy() do
 					if test_input.expected_tools then
 						assert.are.same(test_input.expected_tools, messages.tools)
 					end
+
+					if test_input.expected_messages then
+						assert.are.same(test_input.expected_messages, messages.messages)
+					end
 				end)
 			end
 		end)

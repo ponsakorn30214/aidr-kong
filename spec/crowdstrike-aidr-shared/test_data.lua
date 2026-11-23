@@ -700,4 +700,240 @@ return {
 			},
 		},
 	},
+	-- OpenAI Responses API: instructions + string input, flat function tools converted
+	-- to the Chat Completions shape, built-in tools dropped.
+	{
+		provider = "openai",
+		api = "/v1/responses",
+		type = "request",
+		body = {
+			model = "gpt-4.1",
+			store = false,
+			instructions = "You are a weather assistant.",
+			input = "What is the weather in Paris?",
+			tools = {
+				{
+					type = "function",
+					name = "get_weather",
+					description = "Get current weather for a location.",
+					parameters = {
+						type = "object",
+						properties = { location = { type = "string" } },
+						required = { "location" },
+					},
+					strict = true,
+				},
+				{ type = "web_search" },
+			},
+		},
+		transformed_body = {
+			model = "gpt-4.1",
+			store = false,
+			instructions = "Transformed You are a weather assistant.",
+			input = "Transformed What is the weather in Paris?",
+			tools = {
+				{
+					type = "function",
+					name = "get_weather",
+					description = "Get current weather for a location.",
+					parameters = {
+						type = "object",
+						properties = { location = { type = "string" } },
+						required = { "location" },
+					},
+					strict = true,
+				},
+				{ type = "web_search" },
+			},
+		},
+		expected_messages = {
+			{ role = "system", content = "You are a weather assistant." },
+			{ role = "user", content = "What is the weather in Paris?" },
+		},
+		expected_tools = {
+			{
+				type = "function",
+				["function"] = {
+					name = "get_weather",
+					description = "Get current weather for a location.",
+					parameters = {
+						type = "object",
+						properties = { location = { type = "string" } },
+						required = { "location" },
+					},
+				},
+			},
+		},
+	},
+	-- OpenAI Responses API: message items with string content and content parts.
+	-- Verifies: developer -> system, items without `type` are messages,
+	-- input_text / output_text are rewritten, images and reasoning are left untouched.
+	{
+		provider = "openai",
+		api = "/v1/responses",
+		type = "request",
+		body = {
+			model = "gpt-4.1",
+			input = {
+				{ role = "developer", content = "Developer Message 1" },
+				{
+					type = "message",
+					role = "user",
+					content = {
+						{ type = "input_text", text = "User Message 1" },
+						{ type = "input_image", image_url = "https://example.com/cat.png", detail = "auto" },
+						{ type = "input_text", text = "User Message 2" },
+					},
+				},
+				{
+					type = "reasoning",
+					id = "rs_123",
+					summary = { { type = "summary_text", text = "Reasoning summary" } },
+				},
+				{
+					type = "message",
+					id = "msg_123",
+					role = "assistant",
+					status = "completed",
+					content = {
+						{ type = "output_text", text = "Assistant Message 1", annotations = {} },
+					},
+				},
+				{ type = "item_reference", id = "msg_000" },
+			},
+		},
+		transformed_body = {
+			model = "gpt-4.1",
+			input = {
+				{ role = "developer", content = "Transformed Developer Message 1" },
+				{
+					type = "message",
+					role = "user",
+					content = {
+						{ type = "input_text", text = "Transformed User Message 1" },
+						{ type = "input_image", image_url = "https://example.com/cat.png", detail = "auto" },
+						{ type = "input_text", text = "Transformed User Message 2" },
+					},
+				},
+				{
+					type = "reasoning",
+					id = "rs_123",
+					summary = { { type = "summary_text", text = "Reasoning summary" } },
+				},
+				{
+					type = "message",
+					id = "msg_123",
+					role = "assistant",
+					status = "completed",
+					content = {
+						{ type = "output_text", text = "Transformed Assistant Message 1", annotations = {} },
+					},
+				},
+				{ type = "item_reference", id = "msg_000" },
+			},
+		},
+		expected_messages = {
+			{ role = "system", content = "Developer Message 1" },
+			{ role = "user", content = "User Message 1" },
+			{ role = "user", content = "User Message 2" },
+			{ role = "assistant", content = "Assistant Message 1" },
+		},
+	},
+	-- OpenAI Responses API: tool calls and their outputs, mapped like Chat Completions.
+	-- Verifies: function_call / custom_tool_call / mcp_call become context-only assistant
+	-- entries (never rewritten), and their outputs (string or input_text parts) are sent
+	-- as role "tool" and rewritten.
+	{
+		provider = "openai",
+		api = "/v1/responses",
+		type = "request",
+		body = {
+			model = "gpt-4.1",
+			input = {
+				{ role = "user", content = "What is the weather in Paris?" },
+				{
+					type = "function_call",
+					id = "fc_123",
+					call_id = "call_abc123",
+					name = "get_weather",
+					arguments = '{"location":"Paris"}',
+				},
+				{
+					type = "function_call_output",
+					call_id = "call_abc123",
+					output = "The weather in Paris is 18°C and sunny.",
+				},
+				{ type = "custom_tool_call", call_id = "call_def456", name = "run_sql", input = "SELECT 1" },
+				{
+					type = "custom_tool_call_output",
+					call_id = "call_def456",
+					output = {
+						{ type = "input_text", text = "Query result: 1" },
+						{ type = "input_image", image_url = "https://example.com/chart.png" },
+					},
+				},
+				{
+					type = "mcp_call",
+					id = "mcp_123",
+					server_label = "docs",
+					name = "search",
+					arguments = '{"q":"kong"}',
+					output = "Kong is an API gateway.",
+				},
+				{ role = "user", content = "Thanks!" },
+			},
+		},
+		transform_fn = function(message)
+			if message.content == nil then
+				return { role = message.role, content = nil }
+			end
+			return { role = message.role, content = "Transformed " .. message.content }
+		end,
+		transformed_body = {
+			model = "gpt-4.1",
+			input = {
+				{ role = "user", content = "Transformed What is the weather in Paris?" },
+				{
+					type = "function_call",
+					id = "fc_123",
+					call_id = "call_abc123",
+					name = "get_weather",
+					arguments = '{"location":"Paris"}',
+				},
+				{
+					type = "function_call_output",
+					call_id = "call_abc123",
+					output = "Transformed The weather in Paris is 18°C and sunny.",
+				},
+				{ type = "custom_tool_call", call_id = "call_def456", name = "run_sql", input = "SELECT 1" },
+				{
+					type = "custom_tool_call_output",
+					call_id = "call_def456",
+					output = {
+						{ type = "input_text", text = "Transformed Query result: 1" },
+						{ type = "input_image", image_url = "https://example.com/chart.png" },
+					},
+				},
+				{
+					type = "mcp_call",
+					id = "mcp_123",
+					server_label = "docs",
+					name = "search",
+					arguments = '{"q":"kong"}',
+					output = "Transformed Kong is an API gateway.",
+				},
+				{ role = "user", content = "Transformed Thanks!" },
+			},
+		},
+		expected_messages = {
+			{ role = "user", content = "What is the weather in Paris?" },
+			{ role = "assistant" },
+			{ role = "tool", content = "The weather in Paris is 18°C and sunny." },
+			{ role = "assistant" },
+			{ role = "tool", content = "Query result: 1" },
+			{ role = "assistant" },
+			{ role = "tool", content = "Kong is an API gateway." },
+			{ role = "user", content = "Thanks!" },
+		},
+	},
 }
