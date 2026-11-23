@@ -1013,4 +1013,49 @@ return {
 			{ role = "assistant", content = "Assistant Message 2" },
 		},
 	},
+	-- Azure OpenAI Responses API reuses the OpenAI Responses translator
+	{
+		provider = "azureai",
+		api = "/responses",
+		type = "request",
+		body = {
+			model = "my-gpt-4.1-deployment",
+			instructions = "System Message 1",
+			input = {
+				{ role = "user", content = { { type = "input_text", text = "User Message 1" } } },
+			},
+		},
+		transformed_body = {
+			model = "my-gpt-4.1-deployment",
+			instructions = "Transformed System Message 1",
+			input = {
+				{ role = "user", content = { { type = "input_text", text = "Transformed User Message 1" } } },
+			},
+		},
+	},
+	{
+		provider = "azureai",
+		api = "/responses",
+		type = "response",
+		body = {
+			object = "response",
+			output = {
+				{
+					type = "message",
+					role = "assistant",
+					content = { { type = "output_text", text = "Assistant Message 1" } },
+				},
+			},
+		},
+		transformed_body = {
+			object = "response",
+			output = {
+				{
+					type = "message",
+					role = "assistant",
+					content = { { type = "output_text", text = "Transformed Assistant Message 1" } },
+				},
+			},
+		},
+	},
 }
