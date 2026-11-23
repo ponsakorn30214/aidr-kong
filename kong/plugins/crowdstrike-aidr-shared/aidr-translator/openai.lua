@@ -216,6 +216,37 @@ local function prepare_responses_request(request)
 	return ret
 end
 
+-- Only output_text parts of `message` output items are inspected, the same
+-- way the Chat Completions translator only inspects choices[].message.content.
+local function prepare_responses_response(response)
+	if type(response) ~= "table" then
+		return nil, "Invalid response object"
+	end
+
+	if response.object ~= "response" then
+		return nil, "Invalid response object"
+	end
+
+	local ret = Model.NewJSONMessageMap()
+
+	if type(response.output) ~= "table" then
+		return ret
+	end
+
+	for idx, item in ipairs(response.output) do
+		if type(item) == "table" and item.type == "message" and type(item.content) == "table" then
+			local role = role_transform[item.role] or item.role or Model.AidrRoles.PromptRoleLlm
+			for jdx, part in ipairs(item.content) do
+				if type(part) == "table" and part.type == "output_text" and type(part.text) == "string" then
+					ret:add_message(part.text, role, { "output", idx, "content", jdx, "text" })
+				end
+			end
+		end
+	end
+
+	return ret
+end
+
 local OpenAiTranslator = {
 	["/v1/chat/completions"] = {
 		["request"] = prepare_chat_completions_request,
@@ -227,6 +258,7 @@ local OpenAiTranslator = {
 	},
 	["/v1/responses"] = {
 		["request"] = prepare_responses_request,
+		["response"] = prepare_responses_response,
 	},
 }
 

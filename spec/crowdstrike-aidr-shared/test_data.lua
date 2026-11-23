@@ -936,4 +936,81 @@ return {
 			{ role = "user", content = "Thanks!" },
 		},
 	},
+	-- OpenAI Responses API response: only output_text parts of message items are
+	-- inspected; reasoning, function_call and refusal parts are left untouched.
+	{
+		provider = "openai",
+		api = "/v1/responses",
+		type = "response",
+		body = {
+			id = "resp_123",
+			object = "response",
+			status = "completed",
+			model = "gpt-4.1",
+			output = {
+				{
+					type = "reasoning",
+					id = "rs_123",
+					summary = { { type = "summary_text", text = "Reasoning summary" } },
+				},
+				{
+					type = "message",
+					id = "msg_123",
+					status = "completed",
+					role = "assistant",
+					content = {
+						{ type = "output_text", text = "Assistant Message 1", annotations = {} },
+						{ type = "refusal", refusal = "I can't help with that." },
+						{ type = "output_text", text = "Assistant Message 2", annotations = {} },
+					},
+				},
+				{
+					type = "function_call",
+					id = "fc_123",
+					call_id = "call_abc123",
+					name = "get_weather",
+					arguments = '{"location":"Paris"}',
+					status = "completed",
+				},
+			},
+			usage = { input_tokens = 10, output_tokens = 20, total_tokens = 30 },
+		},
+		transformed_body = {
+			id = "resp_123",
+			object = "response",
+			status = "completed",
+			model = "gpt-4.1",
+			output = {
+				{
+					type = "reasoning",
+					id = "rs_123",
+					summary = { { type = "summary_text", text = "Reasoning summary" } },
+				},
+				{
+					type = "message",
+					id = "msg_123",
+					status = "completed",
+					role = "assistant",
+					content = {
+						{ type = "output_text", text = "Transformed Assistant Message 1", annotations = {} },
+						{ type = "refusal", refusal = "I can't help with that." },
+						{ type = "output_text", text = "Transformed Assistant Message 2", annotations = {} },
+					},
+				},
+				{
+					type = "function_call",
+					id = "fc_123",
+					call_id = "call_abc123",
+					name = "get_weather",
+					arguments = '{"location":"Paris"}',
+					status = "completed",
+				},
+			},
+			usage = { input_tokens = 10, output_tokens = 20, total_tokens = 30 },
+		},
+		expected_messages = {
+			{ role = "assistant", content = "Assistant Message 1" },
+			{ role = "assistant", content = "Assistant Message 2" },
+		},
+	},
 }
